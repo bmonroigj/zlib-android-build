@@ -1,6 +1,6 @@
 # zlib-android-build
 
-## Cross-compiles zlib library for Android
+### Cross-compiles zlib library for Android
 
 This script cross-compiles **zlib library** for Android (armeabi-v7a, arm64-v8a) using **Android NDK** and **autoconf**, as shown in [Use the NDK with other build systems](https://developer.android.com/ndk/guides/other_build_systems#autoconf).
 
@@ -19,21 +19,26 @@ This script cross-compiles **zlib library** for Android (armeabi-v7a, arm64-v8a)
 - arm (armeabi-v7a)
 - arm64 (arm64-v8a)
 
-### Usage examples:
----
+## Usage examples:
 
 Build **zlib-1.2.11** static libs, for android-21, arm64-v8a
+
 ```
 build_zlib
 ```
+
 Build **zlib-1.1.10** static libs, for android-21, armeabi-v7a
+
 ```
 build_zlib --ndk-dir /path/to/android-ndk --android-abi arm --zlib-version 1.1.10
 ```
+
 Build **zlib-1.2.11** static and shared libs, for android-24, arm64-v8a
+
 ```
 build_zlib --android-abi arm64 --android-api-level 24 --build-shared-libs
 ```
+
 > If the script is invoked with no arguments, by default **zlib-1.2.11** static libraries are compiled for android-21 arm64-v8a using the **Android NDK** path provided by **ANDROID_NDK** environment variable.
 
 ### TODO:
