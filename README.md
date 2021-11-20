@@ -19,7 +19,7 @@ This script cross-compiles **zlib library** for Android (armeabi-v7a, arm64-v8a)
 - arm (armeabi-v7a)
 - arm64 (arm64-v8a)
 
-## Usage examples:
+### Usage examples:
 
 Build **zlib-1.2.11** static libs, for android-21, arm64-v8a
 
