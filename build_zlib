@@ -1,0 +1,204 @@
+#!/bin/bash
+#
+# Cross-compiles zlib library for Android
+#
+# This script download zlib source code from zlib official website (https://www.zlib.net/)
+#
+# This script cross-compiles zlib library for Android (armeabi-v7a, arm64-v8a)
+# using Android NDK and autoconf, as shown in [Use the NDK with other build systems]
+# (https://developer.android.com/ndk/guides/other_build_systems#autoconf).
+#
+# Dependencies:
+#   - Android NDK r22+
+#   - curl
+#   - make
+#
+# Android Arch Supported:
+#   - arm   (armeabi-v7a)
+#   - arm64 (arm64-v8a)
+
+# Constants
+readonly RED='\033[0;31m'
+readonly NC='\033[0m'
+readonly ZLIB_BASE_URL='https://www.zlib.net/fossils'
+readonly OUTPUT_DIR='output'
+readonly DOWNLOADS_DIR='downloads'
+readonly LOG_FILE='build.log'
+
+print_usage() {
+  echo 'usage:'
+  echo '  build_zlib [-h | --help]            (Print this help)'
+  echo '    [-c | --clean]                    (Clean output and download directories)'
+  echo '    [--ndk-dir ANDROID_NDK_DIR]       (Default: $ANDROID_NDK)'
+  echo '    [--android-abi ANDROID_ABI]       (Default: arm64, Values: arm | arm64)'
+  echo '    [--android-abi ANDROID_ABI]       (Default: arm64, Values: arm | arm64)'
+  echo '    [--android-api-level API_LEVEL]   (Default: 21)'
+  echo '    [--zlib-version ZLIB_VERSION]     (Default: 1.2.11)'
+  echo '    [--build-shared-libs]             (Default: Build static libs, no shared)'
+  echo
+  echo 'exmples:'
+  echo '  # Build zlib-1.2.11 static libs, for android-21, arm64-v8a'
+  echo '  build_zlib'
+  echo
+  echo '  # Build zlib-1.1.10 static libs, for android-21, armeabi-v7a'
+  echo '  build_zlib --ndk-dir /path/to/android-ndk --android-abi arm --zlib-version 1.1.10'
+  echo
+  echo '  # Build zlib-1.2.11 static and shared libs, for android-24, arm64-v8a'
+  echo '  build_zlib --android-abi arm64 --android-api-level 24 --build-shared-libs'
+}
+
+err() {
+  echo -e "${RED}$*${NC}" >&2
+}
+
+cleanup() {
+  echo "Cleaning ..."
+  rm -rf $OUTPUT_DIR $DOWNLOADS_DIR $LOG_FILE
+  rm -rf `find . -type d -name zlib-*`
+  echo "Everything is clean."
+}
+
+check_error() {
+  if [[ $? -ne 0 ]]; then
+    err $@
+    exit 1
+  fi
+}
+
+############################################
+# Download zlib source code
+# Globals:
+#   ZLIB_BASE_URL
+#   DOWNLOADS_DIR
+# Arguments:
+#   Zlib version to download (i.e., 1.2.11)
+############################################
+download_zlib() {
+  local zlib=zlib-$1.tar.gz
+  if [[ ! -d $DOWNLOADS_DIR || ! -f "$DOWNLOADS_DIR/$zlib" ]]; then
+    echo "Downloading $zlib ..."
+    mkdir -p $DOWNLOADS_DIR && cd $DOWNLOADS_DIR
+    curl -sfSL $ZLIB_BASE_URL/$zlib -o $zlib 2>>"../$LOG_FILE"
+    check_error "Failed to download $zlib. See '$LOG_FILE' for details."
+    cd ..
+  fi
+}
+
+############################################
+# Extract zlib source code
+# Globals:
+#   DOWNLOADS_DIR
+# Arguments:
+#   Zlib version to extract (i.e., 1.2.11)
+############################################
+extract_zlib() {
+  local zlib=zlib-$1.tar.gz
+  rm -rf $zlib
+  echo "Extracting $zlib ..."
+  tar -xzf "$DOWNLOADS_DIR/$zlib" 2>>$LOG_FILE
+  check_error "Failed to extract $zlib. See '$LOG_FILE' for details."
+}
+
+############################################
+# Export cross build environment variables
+# Arguments:
+#   Android NDK path
+#   Android ABI (i.e., arm, arm64)
+#   Android API Level (i.e., 21)
+############################################
+setup_env() {
+  local uname=`(uname -s || echo unknown) 2>>$LOG_FILE`
+  local ndk_toolchain
+  local ndk_target
+  
+  case "$uname" in
+    Linux* | linux* | GNU | GNU/* | solaris*) ndk_toolchain=linux-x86_64 ;;
+    Darwin* | darwin*) ndk_toolchain=darwin-x86_64 ;;
+    unknown) err 'Failed to get device OS name.'; exit 1 ;;
+    *) err "OS \'$uname\' is not supported."; exit 1 ;;
+  esac
+  
+  case "$2" in
+    arm) ndk_target=armv7a-linux-androideabi ;;
+    arm64) ndk_target=aarch64-linux-android ;;
+    *) err "ABI \'$2\' is not supported."; exit 1 ;;
+  esac
+  
+  export NDK=$1
+  export TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/$ndk_toolchain
+  export TARGET=$ndk_target
+  export API=$3
+  export AR=$TOOLCHAIN/bin/llvm-ar
+  export CC=$TOOLCHAIN/bin/$TARGET$API-clang
+  export AS=$CC
+  export CXX=$TOOLCHAIN/bin/$TARGET$API-clang++
+  export LD=$TOOLCHAIN/bin/ld
+  export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+  export STRIP=$TOOLCHAIN/bin/llvm-strip
+}
+
+############################################
+# Build zlib
+# Globals:
+#   OUTPUT_DIR
+# Arguments:
+#   Zlib version to build
+#   Android ABI (i.e., arm, arm64)
+#   Build type argument (i.e., --static)
+############################################
+build_zlib() {
+  local src_dir=zlib-$1
+  local out_dir
+  
+  case "$2" in
+    arm) out_dir="$OUTPUT_DIR/$src_dir/armeabi-v7a" ;;
+    arm64) out_dir="$OUTPUT_DIR/$src_dir/arm64-v8a" ;;
+    *) err "ABI \'$3\' is not supported."; exit 1 ;;
+  esac
+  
+  cd $src_dir
+  echo "Building $src_dir ..."
+  ./configure --prefix="../$out_dir" $3 1>/dev/null 2>>"../$LOG_FILE"
+  check_error "Error building $src_dir. See '$LOG_FILE' for details."
+  make -s 1>/dev/null 2>>"../$LOG_FILE"
+  check_error "Error building $src_dir. See '$LOG_FILE' for details."
+  make -s install 1>/dev/null 2>>"../$LOG_FILE"
+  check_error "Error building $src_dir. See '$LOG_FILE' for details."
+  cd ..
+  rm -rf $src_dir
+  echo "Done."
+}
+
+############################################
+# Entry point
+# Arguments:
+#   Program arguments (See usage)
+############################################
+main() {
+  local android_ndk=$ANDROID_NDK
+  local android_abi='arm64'
+  local android_api_level='21'
+  local zlib_version='1.2.11'
+  local build_type='--static'
+  
+  while [[ $# -ge 1 ]]; do
+    case "$1" in
+      -h | --help) print_usage; exit 0 ;;
+      -c | --clean) cleanup; exit 0 ;;
+      --ndk-dir) android_ndk="$2"; shift; shift ;;
+      --android-abi) android_abi="$2"; shift; shift ;;
+      --android-api-level) android_api_level="$2"; shift; shift ;;
+      --zlib-version) zlib_version="$2"; shift; shift ;;
+      --build-shared-libs) build_type=''; shift ;;
+      *) err "Unknown argument $1"; print_usage; exit 1 ;;
+    esac
+  done
+  
+  download_zlib $zlib_version
+  extract_zlib $zlib_version
+  setup_env $android_ndk $android_abi $android_api_level
+  build_zlib $zlib_version $android_abi $build_type
+  exit 0
+}
+
+main $@
