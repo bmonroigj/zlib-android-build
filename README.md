@@ -2,7 +2,7 @@
 
 ### Cross-compiles zlib library for Android
 
-This script cross-compiles **zlib library** for Android (armeabi-v7a, arm64-v8a) using **Android NDK** and **autoconf**, as shown in [Use the NDK with other build systems](https://developer.android.com/ndk/guides/other_build_systems#autoconf).
+This script cross-compiles **zlib library** for Android (armeabi-v7a, arm64-v8a, x86, x86-64) using **Android NDK** and **autoconf**, as shown in [Use the NDK with other build systems](https://developer.android.com/ndk/guides/other_build_systems#autoconf).
 
 > This script has been tested on Debian GNU/Linux 10 (buster) x86_64 with Android NDK r22b (22.1.7171670).
 
@@ -18,6 +18,8 @@ This script cross-compiles **zlib library** for Android (armeabi-v7a, arm64-v8a)
 
 - arm (armeabi-v7a)
 - arm64 (arm64-v8a)
+- x86
+- x86-64
 
 ### Usage examples:
 

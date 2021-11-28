@@ -4,7 +4,7 @@
 #
 # This script download zlib source code from zlib official website (https://www.zlib.net/)
 #
-# This script cross-compiles zlib library for Android (armeabi-v7a, arm64-v8a)
+# This script cross-compiles zlib library for Android (armeabi-v7a, arm64-v8a, x86, x86-64)
 # using Android NDK and autoconf, as shown in [Use the NDK with other build systems]
 # (https://developer.android.com/ndk/guides/other_build_systems#autoconf).
 #
@@ -16,6 +16,8 @@
 # Android Arch Supported:
 #   - arm   (armeabi-v7a)
 #   - arm64 (arm64-v8a)
+#   - x86
+#   - x86-64
 
 # Constants
 readonly RED='\033[0;31m'
@@ -30,8 +32,7 @@ print_usage() {
   echo '  build_zlib [-h | --help]            (Print this help)'
   echo '    [-c | --clean]                    (Clean output and download directories)'
   echo '    [--ndk-dir ANDROID_NDK_DIR]       (Default: $ANDROID_NDK)'
-  echo '    [--android-abi ANDROID_ABI]       (Default: arm64, Values: arm | arm64)'
-  echo '    [--android-abi ANDROID_ABI]       (Default: arm64, Values: arm | arm64)'
+  echo '    [--android-abi ANDROID_ABI]       (Default: arm64, Values: arm | arm64 | x86 | x86-64)'
   echo '    [--android-api-level API_LEVEL]   (Default: 21)'
   echo '    [--zlib-version ZLIB_VERSION]     (Default: 1.2.11)'
   echo '    [--build-shared-libs]             (Default: Build static libs, no shared)'
@@ -103,7 +104,7 @@ extract_zlib() {
 # Export cross build environment variables
 # Arguments:
 #   Android NDK path
-#   Android ABI (i.e., arm, arm64)
+#   Android ABI (i.e., arm, arm64, x86, x86-64)
 #   Android API Level (i.e., 21)
 ############################################
 setup_env() {
@@ -121,6 +122,8 @@ setup_env() {
   case "$2" in
     arm) ndk_target=armv7a-linux-androideabi ;;
     arm64) ndk_target=aarch64-linux-android ;;
+    x86) ndk_target=i686-linux-android ;;
+    x86-64) ndk_target=x86_64-linux-android ;;
     *) err "ABI \'$2\' is not supported."; exit 1 ;;
   esac
   
@@ -143,7 +146,7 @@ setup_env() {
 #   OUTPUT_DIR
 # Arguments:
 #   Zlib version to build
-#   Android ABI (i.e., arm, arm64)
+#   Android ABI (i.e., arm, arm64, x86, x86-64)
 #   Build type argument (i.e., --static)
 ############################################
 build_zlib() {
@@ -153,6 +156,8 @@ build_zlib() {
   case "$2" in
     arm) out_dir="$OUTPUT_DIR/$src_dir/armeabi-v7a" ;;
     arm64) out_dir="$OUTPUT_DIR/$src_dir/arm64-v8a" ;;
+    x86) out_dir="$OUTPUT_DIR/$src_dir/x86" ;;
+    x86-64) out_dir="$OUTPUT_DIR/$src_dir/x86-64" ;;
     *) err "ABI \'$3\' is not supported."; exit 1 ;;
   esac
   
