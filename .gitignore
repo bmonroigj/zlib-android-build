@@ -1,3 +1,4 @@
-build.log
-output
 downloads
+output
+zlib-*
+build.log

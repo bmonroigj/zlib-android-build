@@ -32,20 +32,20 @@ print_usage() {
   echo '  build_zlib [-h | --help]            (Print this help)'
   echo '    [-c | --clean]                    (Clean output and download directories)'
   echo '    [--ndk-dir ANDROID_NDK_DIR]       (Default: $ANDROID_NDK)'
-  echo '    [--android-abi ANDROID_ABI]       (Default: arm64, Values: arm | arm64 | x86 | x86-64)'
+  echo '    [--android-abi ANDROID_ABI]       (Default: all, Values: all | arm | arm64 | x86 | x86-64)'
   echo '    [--android-api-level API_LEVEL]   (Default: 21)'
   echo '    [--zlib-version ZLIB_VERSION]     (Default: 1.2.11)'
-  echo '    [--build-shared-libs]             (Default: Build static libs, no shared)'
+  echo '    [--static-only]                   (Default: Build static and shared libs)'
   echo
   echo 'exmples:'
-  echo '  # Build zlib-1.2.11 static libs, for android-21, arm64-v8a'
+  echo '  # Build zlib-1.2.11 static and shared libs, for android-21, all supported architectures'
   echo '  build_zlib'
   echo
-  echo '  # Build zlib-1.1.10 static libs, for android-21, armeabi-v7a'
+  echo '  # Build zlib-1.1.10 static and shared libs, for android-21, armeabi-v7a'
   echo '  build_zlib --ndk-dir /path/to/android-ndk --android-abi arm --zlib-version 1.1.10'
   echo
-  echo '  # Build zlib-1.2.11 static and shared libs, for android-24, arm64-v8a'
-  echo '  build_zlib --android-abi arm64 --android-api-level 24 --build-shared-libs'
+  echo '  # Build zlib-1.2.11 static libs, for android-24, arm64-v8a'
+  echo '  build_zlib --android-abi arm64 --android-api-level 24 --static-only'
 }
 
 err() {
@@ -152,17 +152,20 @@ setup_env() {
 build_zlib() {
   local src_dir=zlib-$1
   local out_dir
+  local abi
   
   case "$2" in
-    arm) out_dir="$OUTPUT_DIR/$src_dir/armeabi-v7a" ;;
-    arm64) out_dir="$OUTPUT_DIR/$src_dir/arm64-v8a" ;;
-    x86) out_dir="$OUTPUT_DIR/$src_dir/x86" ;;
-    x86-64) out_dir="$OUTPUT_DIR/$src_dir/x86-64" ;;
-    *) err "ABI \'$3\' is not supported."; exit 1 ;;
+    arm) abi='armeabi-v7a' ;;
+    arm64) abi='arm64-v8a' ;;
+    x86) abi='x86' ;;
+    x86-64) abi='x86-64' ;;
+    *) err "ABI \'$2\' is not supported."; exit 1 ;;
   esac
   
+  out_dir="$OUTPUT_DIR/$src_dir/$abi"
+  
   cd $src_dir
-  echo "Building $src_dir ..."
+  echo "Building $src_dir for $abi ..."
   ./configure --prefix="../$out_dir" $3 1>/dev/null 2>>"../$LOG_FILE"
   check_error "Error building $src_dir. See '$LOG_FILE' for details."
   make -s 1>/dev/null 2>>"../$LOG_FILE"
@@ -181,10 +184,10 @@ build_zlib() {
 ############################################
 main() {
   local android_ndk=$ANDROID_NDK
-  local android_abi='arm64'
+  local android_abi='all'
   local android_api_level='21'
   local zlib_version='1.2.11'
-  local build_type='--static'
+  local build_type=''
   
   while [[ $# -ge 1 ]]; do
     case "$1" in
@@ -194,15 +197,24 @@ main() {
       --android-abi) android_abi="$2"; shift; shift ;;
       --android-api-level) android_api_level="$2"; shift; shift ;;
       --zlib-version) zlib_version="$2"; shift; shift ;;
-      --build-shared-libs) build_type=''; shift ;;
+      --static-only) build_type='--static'; shift ;;
       *) err "Unknown argument $1"; print_usage; exit 1 ;;
     esac
   done
   
   download_zlib $zlib_version
-  extract_zlib $zlib_version
-  setup_env $android_ndk $android_abi $android_api_level
-  build_zlib $zlib_version $android_abi $build_type
+  
+  if [[ $android_abi -eq 'all' ]]; then
+    for abi in arm arm64 x86 x86-64; do
+      extract_zlib $zlib_version
+      setup_env $android_ndk $abi $android_api_level
+      build_zlib $zlib_version $abi $build_type
+    done
+  else
+    extract_zlib $zlib_version
+    setup_env $android_ndk $android_abi $android_api_level
+    build_zlib $zlib_version $android_abi $build_type
+  fi
   exit 0
 }
 
