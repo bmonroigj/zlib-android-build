@@ -35,7 +35,8 @@ print_usage() {
   echo '    [--android-abi ANDROID_ABI]       (Default: all, Values: all | arm | arm64 | x86 | x86-64)'
   echo '    [--android-api-level API_LEVEL]   (Default: 21)'
   echo '    [--zlib-version ZLIB_VERSION]     (Default: 1.2.11)'
-  echo '    [--static-only]                   (Default: Build static and shared libs)'
+  echo '    [--build-type BUILD_TYPE]         (Default: Build Debug and Realease, Values: all | debug | release)'
+  echo '    [-s | --static]                   (Default: Build static and shared libs)'
   echo
   echo 'exmples:'
   echo '  # Build zlib-1.2.11 static and shared libs, for android-21, all supported architectures'
@@ -45,7 +46,7 @@ print_usage() {
   echo '  build_zlib --ndk-dir /path/to/android-ndk --android-abi arm --zlib-version 1.1.10'
   echo
   echo '  # Build zlib-1.2.11 static libs, for android-24, arm64-v8a'
-  echo '  build_zlib --android-abi arm64 --android-api-level 24 --static-only'
+  echo '  build_zlib --android-abi arm64 --android-api-level 24 --static'
 }
 
 err() {
@@ -54,7 +55,7 @@ err() {
 
 cleanup() {
   echo "Cleaning ..."
-  rm -rf $OUTPUT_DIR $DOWNLOADS_DIR $LOG_FILE
+  rm -rf $OUTPUT_DIR $LOG_FILE
   rm -rf `find . -type d -name zlib-*`
   echo "Everything is clean."
 }
@@ -124,7 +125,7 @@ setup_env() {
     arm64) ndk_target=aarch64-linux-android ;;
     x86) ndk_target=i686-linux-android ;;
     x86-64) ndk_target=x86_64-linux-android ;;
-    *) err "ABI \'$2\' is not supported."; exit 1 ;;
+    *) err "ABI '$2' is not supported."; exit 1 ;;
   esac
   
   export NDK=$1
@@ -147,12 +148,14 @@ setup_env() {
 # Arguments:
 #   Zlib version to build
 #   Android ABI (i.e., arm, arm64, x86, x86-64)
-#   Build type argument (i.e., --static)
+#   Build type (i.e., all, debug, release)
+#   Build arguments (i.e., --static)
 ############################################
 build_zlib() {
   local src_dir=zlib-$1
   local out_dir
   local abi
+  local build_args=$4
   
   case "$2" in
     arm) abi='armeabi-v7a' ;;
@@ -162,11 +165,15 @@ build_zlib() {
     *) err "ABI \'$2\' is not supported."; exit 1 ;;
   esac
   
-  out_dir="$OUTPUT_DIR/$src_dir/$abi"
+  if [[ "$3" == 'Debug' ]]; then
+    build_args+=' --debug'
+  fi
+  
+  out_dir="$OUTPUT_DIR/$src_dir/$3/$abi"
   
   cd $src_dir
-  echo "Building $src_dir for $abi ..."
-  ./configure --prefix="../$out_dir" $3 1>/dev/null 2>>"../$LOG_FILE"
+  echo "Building $src_dir for $abi ($3) ..."
+  ./configure --prefix="../$out_dir" $build_args 1>/dev/null 2>>"../$LOG_FILE"
   check_error "Error building $src_dir. See '$LOG_FILE' for details."
   make -s 1>/dev/null 2>>"../$LOG_FILE"
   check_error "Error building $src_dir. See '$LOG_FILE' for details."
@@ -187,7 +194,8 @@ main() {
   local android_abi='all'
   local android_api_level='21'
   local zlib_version='1.2.11'
-  local build_type=''
+  local build_type='all'
+  local build_args=''
   
   while [[ $# -ge 1 ]]; do
     case "$1" in
@@ -197,24 +205,34 @@ main() {
       --android-abi) android_abi="$2"; shift; shift ;;
       --android-api-level) android_api_level="$2"; shift; shift ;;
       --zlib-version) zlib_version="$2"; shift; shift ;;
-      --static-only) build_type='--static'; shift ;;
+      --build-type) build_type="$2"; shift; shift ;;
+      -s | --static) build_args+=' --static'; shift ;;
       *) err "Unknown argument $1"; print_usage; exit 1 ;;
     esac
   done
   
+  case "$build_type" in
+    "debug") build_type='Debug' ;;
+    "release") build_type='Release' ;;
+    "all") build_type='Debug Release' ;;
+    *) err "Unknown build type $build_type"; print_usage; exit 1 ;;
+  esac
+  
   download_zlib $zlib_version
   
-  if [[ $android_abi -eq 'all' ]]; then
-    for abi in arm arm64 x86 x86-64; do
+  for type in $build_type; do
+    if [[ $android_abi == 'all' ]]; then
+      for abi in arm arm64 x86 x86-64; do
+        extract_zlib $zlib_version
+        setup_env $android_ndk $abi $android_api_level
+        build_zlib $zlib_version $abi $type "$build_args"
+      done
+    else
       extract_zlib $zlib_version
-      setup_env $android_ndk $abi $android_api_level
-      build_zlib $zlib_version $abi $build_type
-    done
-  else
-    extract_zlib $zlib_version
-    setup_env $android_ndk $android_abi $android_api_level
-    build_zlib $zlib_version $android_abi $build_type
-  fi
+      setup_env $android_ndk $android_abi $android_api_level
+      build_zlib $zlib_version $android_abi $type "$build_args"
+    fi
+  done
   exit 0
 }
 

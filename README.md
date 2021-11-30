@@ -38,7 +38,7 @@ build_zlib --ndk-dir /path/to/android-ndk --android-abi arm --zlib-version 1.1.1
 Build **zlib-1.2.11** static libs, for android-24, arm64-v8a
 
 ```
-build_zlib --android-abi arm64 --android-api-level 24 --static-only
+build_zlib --android-abi arm64 --android-api-level 24 --static
 ```
 
 > If the script is invoked with no arguments, by default **zlib-1.2.11** static and shared libraries are compiled for android-21 (armeabi-v7a, arm64-v8a, x86, x86-64) using the **Android NDK** path provided by **ANDROID_NDK** environment variable.
